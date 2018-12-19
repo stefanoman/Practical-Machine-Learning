@@ -1,0 +1,160 @@
+---
+title: "Practical Machine Learning Course Project"
+author: "S.D."
+date: "December 18, 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# PRACTICAL MACHINE LEARNING COURSE PROJECT:  PREDICTING AND CLASSIFYING USING THE WEIGHT LIFTING EXERCISE DATASET
+
+## EXECUTIVE SUMMARY
+This report summarizes the prediction of exercise type using the Weight Lifting Exercise Dataset.  This dataset contains accelerometer data from the belt, forearm, arm, and dumbell of 6 participants.  The data quantifies the motion profile for each user as they conducted barbell lifts with different variations, designated as classes "A"-"E".  
+
+For this project, the dataset was first cleansed, then trained and modeled using the Classification Tree, Random Forest, and Generalized Boost Model techniques presented in the Practical Machine Learning course.   Of these techniques, the Random Forest model produced the highest quality predictions when applied to the test dataset, and was able to correctly identify all twenty exercise cases in the course final quiz.
+
+## Project Description
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
+
+## Setup
+First load required libraries.
+
+```{r libraries, echo=TRUE, verbose=FALSE}
+library(caret)
+library(dplyr)
+library(rattle)
+library(parallel)
+library(doParallel)
+library(rpart)
+library(rpart.plot)
+library(ggplot2)
+```
+
+Before proceeding, set a seed to ensure consistent and reproducible results when running the analysis multiple times.
+```{r}
+set.seed(1357)
+```
+
+## Data Preparation
+The first step is to import the Weight Lifing Exercise dataset.  The data is organized in a training set, and a test set.  The training file is a large set of data consisting of identifier information, time stamps, and movement measurements organized across 160 fields  The test file consists of twenty exercise cases which will be identified using the modeling results.
+
+First, load the data into training and test tables:
+```{r load}
+#Load in training and test data sets
+train <- read.csv("pml-training.csv")
+test <- read.csv("pml-testing.csv")
+
+# Training data has many columns with mostly NAs.  Check for columns that are over half populated with "NAs" and reemove columns
+RemNA <- sapply(train, function(x) mean(is.na(x))) > 0.50
+train1 <- train[, RemNA==F]
+
+# Remove fields that are not useful as predictors (1:8) 
+train1 <- train1[,8:length(train1)]
+
+#remove columns with variables that do not change (near zero variance)
+NZV <- nearZeroVar(train1)
+train1 <- train1[, -NZV]
+dim(train1)
+```
+The result of this cleansing is a Test Dataset that consists of 53 fields.  The remainder of the 160 original fields are discarded because they do not have any value for prediction model development. 
+
+Next, create a partition in the training data set.  70% of the training set will be for training, and the remaining 30% for testing the model.  The FINAL test set is not used for predicting the exercises until the end, after the model is validated.
+```{r partition }
+#create partitions in the training set to fit the model (70/30)
+inTrain <- createDataPartition(y=train1$classe, p=0.7, list=FALSE)
+pTrain <- train1[inTrain, ]
+pTest <- train1[-inTrain, ]
+dim(pTrain)
+```
+
+During model development, the random forest and GBM operations were found to take a very long time to execute on the i5 processor. To speed things up I configured the script to use a multi-core cluster and perform parallel processing.  
+```{r multicore}
+# Setup mulicore cluster - Random Forest was taking very long with single core
+cluster <- makeCluster(detectCores() - 1) # convention to leave 1 core for OS
+registerDoParallel(cluster)
+```
+
+## Developing the Model
+Three approaches were used:  Classification Tree, Random Forest, and Generalized Boost Model.  The GBM was used to evaluate whether additional accuracy could be achieved beyond what the first two models produced.
+
+### Classification Tree  
+
+```{r CT}
+fitControl <- trainControl(method = "cv", number = 5, allowParallel = TRUE)
+
+model_CT <- train(classe~., data=pTrain, method="rpart", trControl=fitControl)
+ClassTreeMod1 <- rpart(classe ~ ., pTrain,method ="class")
+fancyRpartPlot(ClassTreeMod1)
+
+predictCT <- predict(ClassTreeMod1, pTest,type="class")
+
+cmdt <- confusionMatrix(predictCT, pTest$classe)
+cmdt  # Confusion Matrix for Decision Tree
+```
+As seen in the confusion matrix, the accuracy of the classification tree approach was `r round(cmdt$overall[[1]],4)`
+
+### Random Forest with parallel cores
+```{r RF}
+# Use parallel process to execute random forest training
+system.time(modRF <- train(classe ~., method="rf",data=pTrain,trControl = fitControl))
+modRF
+
+# find and plot the most important variables in the data
+MostImpVars <- varImp(modRF)
+MostImpVars
+#varImpPlot(modRF)
+
+# Use the fitted RF model to predict with the test data 
+predictRF <- predict(modRF, newdata=pTest)
+cmrf <- confusionMatrix(predictRF, pTest$classe)
+
+# MostImpVars <- varImp(modRF)
+# MostImpVars
+```
+The maximum accuracy for this model was `r max( modRF$results[1:3,2])` and occured with a variable quantity of 27 (mtry). 
+
+###Inspect Importance of Variables
+The figure below shows the relative importance of the predictors.  The weighting is dominated by "roll_belt", followed by "pitch_forearm" and "yaw_belt".   
+```{r plotVar}
+ggplot(data=MostImpVars) + 
+  geom_bar(position="dodge",stat="identity",colour="black",fill="lightgreen") + 
+  ggtitle("Variable Importance")  
+```
+
+###  Boost Model.  See if additional variables help the model  
+
+Now see if the Generalized Boost Model will add additional accuracy by boosting using all variables.  
+
+```{r boost}  
+controlGBM <- trainControl(method = "repeatedcv", number = 5, repeats = 1)
+system.time(modFitGBM  <- train(classe ~ ., data=pTrain, method = "gbm",trControl = controlGBM, verbose = FALSE))
+modFitGBM$finalModel
+
+stopCluster(cluster)
+predictGBM <- predict(modFitGBM, newdata=pTest)
+confMatGBM <- confusionMatrix(predictGBM, pTest$classe)
+confMatGBM
+```
+The maximum accuracy for this model was `r  round(confMatGBM$overall[[1]],4)`, which is slightly lower than with the Random Forest Model.  
+
+
+### Predict exercise classification using the Final Test set   
+The resulting accuracy of the three models tested is shown in the table below.  From these results, Random Forest modeling produced the highest accuracy result. I use this model to classify the exercise classes in the final test set.  
+
+```{r summary table}
+acc_sum <- matrix(c(round(cmdt$overall[[1]],4),round(max( modRF$results[1:3,2]),4), round(confMatGBM$overall[[1]],4)),ncol=1)
+colnames(acc_sum)<- c('Accuracy')
+rownames(acc_sum)<- c('Classification Tree','Random Forest','GBM')
+acc_sum
+```
+
+##Final Prediction using Random Forest and the Final Test Data
+Applying the Random Forest model to the final test data produces the following Class predictions.  These were all correctly identified based on the final course quiz.
+
+```{r Final}
+predFINAL <-  predict(modRF, newdata=test)
+predFINAL
+```
