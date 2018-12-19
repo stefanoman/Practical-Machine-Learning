@@ -148,7 +148,7 @@ cmdt  # Confusion Matrix for Decision Tree
 ## Detection Prevalence   0.2760   0.1545   0.2442   0.1558   0.1696
 ## Balanced Accuracy      0.8982   0.7597   0.8420   0.8119   0.8553
 ```
-As seen in the confusion matrix, the accuracy of the classification tree approach was 0.7414
+As seen in the confusion matrix, the accuracy of the classification tree approach was 0.7414 and the out of sample error was 'r 1-round(cmdt$overall[[1]],4)'.  
 
 ### Random Forest with parallel cores
 
@@ -159,7 +159,7 @@ system.time(modRF <- train(classe ~., method="rf",data=pTrain,trControl = fitCon
 
 ```
 ##    user  system elapsed 
-##   54.22    4.00  305.06
+##   53.16    4.39  288.22
 ```
 
 ```r
@@ -231,7 +231,7 @@ cmrf <- confusionMatrix(predictRF, pTest$classe)
 # MostImpVars <- varImp(modRF)
 # MostImpVars
 ```
-The maximum accuracy for this model was 0.9919193 and occured with a variable quantity of 27 (mtry). 
+The maximum accuracy for this model was 0.9919193 and occured with a variable quantity of 27 (mtry). The out of sample error was 0.0080807.  
 
 ###Inspect Importance of Variables
 The figure below shows the relative importance of the predictors.  The weighting is dominated by "roll_belt", followed by "pitch_forearm" and "yaw_belt".   
@@ -256,7 +256,7 @@ system.time(modFitGBM  <- train(classe ~ ., data=pTrain, method = "gbm",trContro
 
 ```
 ##    user  system elapsed 
-##   31.17    1.58  128.50
+##   29.51    1.99  122.81
 ```
 
 ```r
@@ -309,7 +309,7 @@ confMatGBM
 ## Detection Prevalence   0.2862   0.1920   0.1806   0.1604   0.1808
 ## Balanced Accuracy      0.9830   0.9558   0.9714   0.9704   0.9855
 ```
-The maximum accuracy for this model was 0.9587, which is slightly lower than with the Random Forest Model.  
+The maximum accuracy for this model was 0.9587, which is slightly lower than with the Random Forest Model.  The out of sample error was 0.0413.  
 
 
 ### Predict exercise classification using the Final Test set   
