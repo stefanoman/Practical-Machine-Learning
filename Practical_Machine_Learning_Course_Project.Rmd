@@ -2,9 +2,7 @@
 title: "Practical Machine Learning Course Project"
 author: "S.D."
 date: "December 18, 2018"
-output: 
-  html_document:
-    keep_md: true
+output: html_document
 ---
 
 ```{r setup, include=FALSE}
@@ -96,7 +94,7 @@ predictCT <- predict(ClassTreeMod1, pTest,type="class")
 cmdt <- confusionMatrix(predictCT, pTest$classe)
 cmdt  # Confusion Matrix for Decision Tree
 ```
-As seen in the confusion matrix, the accuracy of the classification tree approach was `r round(cmdt$overall[[1]],4)` and the out of sample error was `r 1-round(cmdt$overall[[1]],4)`.  
+As seen in the confusion matrix, the accuracy of the classification tree approach was `r round(cmdt$overall[[1]],4)` and the out of sample error was 'r 1-round(cmdt$overall[[1]],4)'.  
 
 ### Random Forest with parallel cores
 ```{r RF}

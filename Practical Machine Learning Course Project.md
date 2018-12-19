@@ -2,7 +2,9 @@
 title: "Practical Machine Learning Course Project"
 author: "S.D."
 date: "December 18, 2018"
-output: html_document
+output: 
+  html_document:
+    keep_md: true
 ---
 
 
@@ -148,7 +150,7 @@ cmdt  # Confusion Matrix for Decision Tree
 ## Detection Prevalence   0.2760   0.1545   0.2442   0.1558   0.1696
 ## Balanced Accuracy      0.8982   0.7597   0.8420   0.8119   0.8553
 ```
-As seen in the confusion matrix, the accuracy of the classification tree approach was 0.7414 and the out of sample error was 'r 1-round(cmdt$overall[[1]],4)'.  
+As seen in the confusion matrix, the accuracy of the classification tree approach was 0.7414 and the out of sample error was 0.2586.  
 
 ### Random Forest with parallel cores
 
@@ -159,7 +161,7 @@ system.time(modRF <- train(classe ~., method="rf",data=pTrain,trControl = fitCon
 
 ```
 ##    user  system elapsed 
-##   53.16    4.39  288.22
+##   54.29    4.44  304.01
 ```
 
 ```r
@@ -256,7 +258,7 @@ system.time(modFitGBM  <- train(classe ~ ., data=pTrain, method = "gbm",trContro
 
 ```
 ##    user  system elapsed 
-##   29.51    1.99  122.81
+##   30.27    1.67  127.04
 ```
 
 ```r
